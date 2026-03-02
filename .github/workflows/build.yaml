@@ -1,3 +1,27 @@
+name: Build Delta (Unsigned IPA)
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Cache Swift Packages
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+
       - name: Build Delta (Unsigned)
         run: |
           xcodebuild archive \
@@ -9,3 +33,15 @@
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ENTITLEMENTS=""
+
+      - name: Create IPA Structure
+        run: |
+          mkdir -p Payload
+          cp -r Delta.xcarchive/Products/Applications/Delta.app Payload/
+          zip -r Delta-Unsigned.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Delta-Unsigned-IPA
+          path: Delta-Unsigned.ipa
