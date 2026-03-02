@@ -16,6 +16,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
+      - name: Force Swift 5.0 in Submodules
+        run: |
+          find . -name "*.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 5.0/g' {} +
+
       - name: Resolve Swift Packages
         run: xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
 
@@ -30,7 +34,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ENTITLEMENTS="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            SWIFT_VERSION=5.0
 
       - name: Create IPA Structure
         run: |
