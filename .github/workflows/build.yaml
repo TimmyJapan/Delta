@@ -12,31 +12,31 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          lfs: true # Git LFSファイルを適切に取得
+          lfs: true
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.app
 
-      - name: Patch Bundle Identifier & Team
+      - name: Patch Project Settings
         run: |
-          # Bundle IDを一意なものに変更 (b6259版)
+          # Swift 6の厳格なチェックを無効化し、5を指定する
+          find . -name "*.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 5.0/g' {} +
           sed -i '' 's/com.rileytestut.Delta/com.b6259.Delta.custom/g' Delta.xcodeproj/project.pbxproj
-          # 署名とチーム設定を無効化（CI上でのエラー回避）
           sed -i '' 's/DevelopmentTeam = .*/DevelopmentTeam = "";/g' Delta.xcodeproj/project.pbxproj
 
       - name: Build Systems Frameworks
         run: |
-          # READMEにある「Systems」を先にビルド
           xcodebuild build \
             -workspace Systems/Systems.xcworkspace \
             -scheme Systems \
             -destination "generic/platform=iOS" \
             -configuration Release \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            OTHER_SWIFT_FLAGS="-suppress-warnings -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-stack-protector" \
+            SWIFT_VERSION=5.0
 
       - name: Build Delta App
         run: |
-          # 本体をアーカイブ
           xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
@@ -44,7 +44,9 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath Delta.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            OTHER_SWIFT_FLAGS="-suppress-warnings" \
+            SWIFT_VERSION=5.0
 
       - name: Create IPA
         run: |
