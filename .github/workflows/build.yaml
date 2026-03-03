@@ -1,4 +1,4 @@
-name: Build Delta (Unsigned IPA)
+name: Build Delta (Unsigned)
 on:
   push:
     branches: [ main ]
@@ -6,25 +6,37 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          lfs: true # Git LFSファイルを適切に取得
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+        run: sudo xcode-select -s /Applications/Xcode_16.app
 
-      - name: Force Swift 5.0 in Submodules
+      - name: Patch Bundle Identifier & Team
         run: |
-          find . -name "*.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 5.0/g' {} +
+          # Bundle IDを一意なものに変更 (b6259版)
+          sed -i '' 's/com.rileytestut.Delta/com.b6259.Delta.custom/g' Delta.xcodeproj/project.pbxproj
+          # 署名とチーム設定を無効化（CI上でのエラー回避）
+          sed -i '' 's/DevelopmentTeam = .*/DevelopmentTeam = "";/g' Delta.xcodeproj/project.pbxproj
 
-      - name: Resolve Swift Packages
-        run: xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
-
-      - name: Build Delta (Unsigned)
+      - name: Build Systems Frameworks
         run: |
+          # READMEにある「Systems」を先にビルド
+          xcodebuild build \
+            -workspace Systems/Systems.xcworkspace \
+            -scheme Systems \
+            -destination "generic/platform=iOS" \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build Delta App
+        run: |
+          # 本体をアーカイブ
           xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
@@ -32,18 +44,16 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath Delta.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ENTITLEMENTS="" \
-            SWIFT_VERSION=5.0
+            CODE_SIGNING_REQUIRED=NO
 
-      - name: Create IPA Structure
+      - name: Create IPA
         run: |
           mkdir -p Payload
           cp -r Delta.xcarchive/Products/Applications/Delta.app Payload/
-          zip -r Delta-Unsigned.ipa Payload
+          zip -r Delta-Custom.ipa Payload
 
-      - name: Upload Artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-Unsigned-IPA
-          path: Delta-Unsigned.ipa
+          name: Delta-IPA
+          path: Delta-Custom.ipa
