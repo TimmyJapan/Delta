@@ -13,17 +13,24 @@ jobs:
         with:
           submodules: recursive
           lfs: true
+          fetch-depth: 0 # すべての履歴を取得してサブモジュールの不整合を防ぐ
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Patch Project Settings
+      - name: Patch Project & Fix Dependencies
         run: |
-          # 全プロジェクトのSwiftバージョンを5.0に統一
+          # Swiftバージョンの強制統一
           find . -name "*.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 5.0/g' {} +
-          # Bundle IDとTeamのパッチ
+          # Bundle IDパッチ
           sed -i '' 's/com.rileytestut.Delta/com.b6259.Delta.custom/g' Delta.xcodeproj/project.pbxproj
-          sed -i '' 's/DevelopmentTeam = .*/DevelopmentTeam = "";/g' Delta.xcodeproj/project.pbxproj
+          # 依存関係のクリーンアップ（キャッシュ起因のエラー対策）
+          rm -rf ~/Library/Developer/Xcode/DerivedData/
+
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
+          xcodebuild -resolvePackageDependencies -workspace Systems/Systems.xcworkspace -scheme Systems
 
       - name: Build Systems Frameworks
         run: |
@@ -32,9 +39,8 @@ jobs:
             -scheme Systems \
             -destination "generic/platform=iOS" \
             -configuration Release \
-            ARCHS="arm64" \
-            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            OTHER_SWIFT_FLAGS="-suppress-warnings"
 
       - name: Build Delta App
         run: |
@@ -44,10 +50,9 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath Delta.xcarchive \
-            ARCHS="arm64" \
-            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            OTHER_SWIFT_FLAGS="-suppress-warnings"
 
       - name: Create IPA
         run: |
@@ -60,4 +65,3 @@ jobs:
         with:
           name: Delta-IPA
           path: Delta-Custom.ipa
-
