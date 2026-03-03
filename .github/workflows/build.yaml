@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,12 +15,13 @@ jobs:
           lfs: true
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Patch Project Settings
         run: |
-          # Swift 6の厳格なチェックを無効化し、5を指定する
+          # 全プロジェクトのSwiftバージョンを5.0に統一
           find . -name "*.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 5.0/g' {} +
+          # Bundle IDとTeamのパッチ
           sed -i '' 's/com.rileytestut.Delta/com.b6259.Delta.custom/g' Delta.xcodeproj/project.pbxproj
           sed -i '' 's/DevelopmentTeam = .*/DevelopmentTeam = "";/g' Delta.xcodeproj/project.pbxproj
 
@@ -31,9 +32,9 @@ jobs:
             -scheme Systems \
             -destination "generic/platform=iOS" \
             -configuration Release \
-            CODE_SIGNING_ALLOWED=NO \
-            OTHER_SWIFT_FLAGS="-suppress-warnings -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-stack-protector" \
-            SWIFT_VERSION=5.0
+            ARCHS="arm64" \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Build Delta App
         run: |
@@ -43,10 +44,10 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath Delta.xcarchive \
+            ARCHS="arm64" \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            OTHER_SWIFT_FLAGS="-suppress-warnings" \
-            SWIFT_VERSION=5.0
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Create IPA
         run: |
@@ -59,3 +60,4 @@ jobs:
         with:
           name: Delta-IPA
           path: Delta-Custom.ipa
+
