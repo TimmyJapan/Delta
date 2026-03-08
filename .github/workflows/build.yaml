@@ -1,67 +1,53 @@
-name: Build Delta (Unsigned)
+name: Build Unsigned Delta IPA
+
+# This allows you to run the build manually from the GitHub Actions tab
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch: 
 
 jobs:
   build:
-    runs-on: macos-14
+    name: Build IPA
+    runs-on: macos-14 # Ensures a modern Xcode environment
+
     steps:
-      - name: Checkout
+      - name: Checkout Delta Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          lfs: true
-          fetch-depth: 0 # すべての履歴を取得してサブモジュールの不整合を防ぐ
+          # If you are running this in your own fork, you can remove the next line.
+          # If running in an empty repo, this pulls directly from Riley's repo.
+          repository: rileytestut/Delta 
+          submodules: recursive # Crucial: Fetches the SNES, N64, etc. cores
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Patch Project & Fix Dependencies
+      - name: Install CocoaPods Dependencies
         run: |
-          # Swiftバージョンの強制統一
-          find . -name "*.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 5.0/g' {} +
-          # Bundle IDパッチ
-          sed -i '' 's/com.rileytestut.Delta/com.b6259.Delta.custom/g' Delta.xcodeproj/project.pbxproj
-          # 依存関係のクリーンアップ（キャッシュ起因のエラー対策）
-          rm -rf ~/Library/Developer/Xcode/DerivedData/
+          # CocoaPods is usually pre-installed on macOS runners, but updating is safe
+          sudo gem install cocoapods
+          pod install
 
-      - name: Resolve Swift Packages
-        run: |
-          xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
-          xcodebuild -resolvePackageDependencies -workspace Systems/Systems.xcworkspace -scheme Systems
-
-      - name: Build Systems Frameworks
-        run: |
-          xcodebuild build \
-            -workspace Systems/Systems.xcworkspace \
-            -scheme Systems \
-            -destination "generic/platform=iOS" \
-            -configuration Release \
-            CODE_SIGNING_ALLOWED=NO \
-            OTHER_SWIFT_FLAGS="-suppress-warnings"
-
-      - name: Build Delta App
+      - name: Build Unsigned Archive
         run: |
           xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
             -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath Delta.xcarchive \
+            -sdk iphoneos \
+            -archivePath $PWD/build/Delta.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            OTHER_SWIFT_FLAGS="-suppress-warnings"
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_IDENTITY=""
 
-      - name: Create IPA
+      - name: Package into IPA
         run: |
+          # Create the Payload folder structure Apple expects
           mkdir -p Payload
-          cp -r Delta.xcarchive/Products/Applications/Delta.app Payload/
-          zip -r Delta-Custom.ipa Payload
+          # Copy the compiled app into the Payload folder
+          cp -r build/Delta.xcarchive/Products/Applications/Delta.app Payload/
+          # Zip it up and rename it to .ipa
+          zip -r Delta.ipa Payload
 
-      - name: Upload
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-IPA
-          path: Delta-Custom.ipa
+          name: Delta-Unsigned
+          path: Delta.ipa
