@@ -20,7 +20,7 @@
 	path = Cores/NESDeltaCore
 	url = git@github.com:rileytestut/NESDeltaCore.git
 [submodule "Cores/N64DeltaCore"]
-	path = Cores/n64deltacore
+	path = Cores/N64DeltaCore
 	url = https://github.com/TimmyJapan/n64deltacore.git
 [submodule "Cores/MelonDSDeltaCore"]
 	path = Cores/MelonDSDeltaCore
