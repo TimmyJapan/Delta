@@ -1,28 +1,49 @@
-name: Build Unsigned Delta IPA
+name: Build Delta Custom Forks (Unsigned)
 
-# This allows you to run the build manually from the GitHub Actions tab
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build IPA
-    runs-on: macos-14 # Ensures a modern Xcode environment
+    name: Build Unsigned IPA
+    runs-on: macos-14
 
     steps:
-      - name: Checkout Delta Repository
+      - name: Checkout Delta (Your Fork)
         uses: actions/checkout@v4
         with:
-          # If you are running this in your own fork, you can remove the next line.
-          # If running in an empty repo, this pulls directly from Riley's repo.
-          repository: rileytestut/Delta 
-          submodules: recursive # Crucial: Fetches the SNES, N64, etc. cores
+          submodules: recursive
+          fetch-depth: 0
 
-      - name: Install CocoaPods Dependencies
+      - name: Sync Submodule URLs
         run: |
-          # CocoaPods is usually pre-installed on macOS runners, but updating is safe
-          sudo gem install cocoapods
+          # This ensures the runner uses the URLs defined in your .gitmodules
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo gem install cocoapods xcodeproj
           pod install
+
+      - name: Fix Swift 6 Compatibility
+        run: |
+          # This Ruby script forces Swift 5.0 and disables strict checks 
+          # across the main project, your forks, and all Pods.
+          ruby -e "
+          require 'xcodeproj'
+          Dir.glob('**/*.xcodeproj').each do |path|
+            puts \"Updating Swift version in #{path}...\"
+            project = Xcodeproj::Project.open(path)
+            project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['SWIFT_VERSION'] = '5.0'
+                config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
+                config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+              end
+            end
+            project.save
+          end"
 
       - name: Build Unsigned Archive
         run: |
@@ -36,19 +57,18 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_IDENTITY="" \
-            SWIFT_VERSION=5.0
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Package into IPA
+      - name: Package IPA
         run: |
-          # Create the Payload folder structure Apple expects
           mkdir -p Payload
-          # Copy the compiled app into the Payload folder
+          # Locate the .app and copy it to Payload
           cp -r build/Delta.xcarchive/Products/Applications/Delta.app Payload/
-          # Zip it up and rename it to .ipa
-          zip -r Delta.ipa Payload
+          # Create the final IPA file
+          zip -r Delta-Custom.ipa Payload
 
-      - name: Upload IPA Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-Unsigned
-          path: Delta.ipa
+          name: Delta-Build-Unsigned
+          path: Delta-Custom.ipa
