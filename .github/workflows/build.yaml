@@ -22,11 +22,11 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-		　- name: Set Safe Git Directory
-        run: git config --global --add safe.directory /github/workspace
+
 
       - name: Sync and Update Submodules
         run: |
+　　　　　　git config --global --add safe.directory /github/workspace
           git submodule sync --recursive
           git submodule update --init --recursive
 
