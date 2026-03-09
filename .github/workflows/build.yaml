@@ -1,4 +1,4 @@
-name: Build Delta (Ultimate Compatibility)
+name: Build Delta (Root Features Fix)
 
 on:
   workflow_dispatch:
@@ -28,14 +28,17 @@ jobs:
           sudo gem install cocoapods
           pod install
 
-      - name: Fix Target Swift Versions
+      - name: Patch Source Code & Project Files
         run: |
-          # This command searches every sub-folder (your forks) for project files
-          # and changes any "Swift 6.0" requirement to "Swift 5.0" 
-          # so Xcode 15.4 can handle them.
+          # 1. Fix the Swift Version in all project files (GPGX, etc.)
           find . -name "project.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0;/SWIFT_VERSION = 5.0;/g' {} +
-          # This also catches cases where it might be 6.x
-          find . -name "project.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.[0-9];/SWIFT_VERSION = 5.0;/g' {} +
+          
+          # 2. Fix the 'OptionValue' constraint in Option.swift (Root Directory)
+          # This line changes 'struct Option<Value>' to 'struct Option<Value: OptionValue>'
+          sed -i '' 's/public struct Option<Value>/public struct Option<Value: OptionValue>/g' DeltaFeatures/Option.swift
+          
+          # 3. Fix the instance method signature if it's separate
+          sed -i '' 's/extension Option where Value/extension Option where Value: OptionValue/g' DeltaFeatures/Option.swift
 
       - name: Build Unsigned Archive
         run: |
@@ -48,18 +51,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGNING_IDENTITY=""
 
       - name: Package IPA
         run: |
           mkdir -p Payload
-          # Grabs the compiled app from your Root structure
           cp -r build/Delta.xcarchive/Products/Applications/Delta.app Payload/
-          zip -r Delta-Custom.ipa Payload
+          zip -r Delta-Fixed.ipa Payload
 
-      - name: Upload Finished IPA
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-Unsigned-Build
-          path: Delta-Custom.ipa
+          name: Delta-Fixed-IPA
+          path: Delta-Fixed.ipa
