@@ -3,6 +3,9 @@ name: Build Delta (Root Features Fix)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read  # Added Git permissions to address access issues.
+
 jobs:
   build:
     name: Build Unsigned IPA
@@ -17,6 +20,9 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Set Safe Git Directory  # Added for safe git operations.
+        run: git config --global --add safe.directory /github/workspace
 
       - name: Sync and Update Submodules
         run: |
