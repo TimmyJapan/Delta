@@ -1,4 +1,5 @@
-name: Build Delta 
+name: Build Delta (Ultimate Compatibility)
+
 on:
   workflow_dispatch:
 
@@ -9,7 +10,6 @@ jobs:
 
     steps:
       - name: Select Xcode 15.4
-        # This version of Xcode is 100% compatible with Delta's current code
         run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
 
       - name: Checkout Delta (Your Fork)
@@ -18,19 +18,27 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Sync Submodules
+      - name: Sync and Update Submodules
         run: |
           git submodule sync --recursive
           git submodule update --init --recursive
 
-      - name: Install Dependencies
+      - name: Install CocoaPods
         run: |
           sudo gem install cocoapods
           pod install
 
+      - name: Fix Target Swift Versions
+        run: |
+          # This command searches every sub-folder (your forks) for project files
+          # and changes any "Swift 6.0" requirement to "Swift 5.0" 
+          # so Xcode 15.4 can handle them.
+          find . -name "project.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0;/SWIFT_VERSION = 5.0;/g' {} +
+          # This also catches cases where it might be 6.x
+          find . -name "project.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.[0-9];/SWIFT_VERSION = 5.0;/g' {} +
+
       - name: Build Unsigned Archive
         run: |
-          # We use xcodebuild to create a generic iOS archive without signing
           xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
@@ -40,19 +48,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_IDENTITY=""
+            CODE_SIGNING_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Package IPA
         run: |
           mkdir -p Payload
-          # Since your structure is direct, we pull the .app from the archive
+          # Grabs the compiled app from your Root structure
           cp -r build/Delta.xcarchive/Products/Applications/Delta.app Payload/
-          zip -r Delta-Build.ipa Payload
+          zip -r Delta-Custom.ipa Payload
 
-      - name: Upload IPA
+      - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-IPA-Unsigned
-          path: Delta-Build.ipa
-
- 
+          name: Delta-Unsigned-Build
+          path: Delta-Custom.ipa
