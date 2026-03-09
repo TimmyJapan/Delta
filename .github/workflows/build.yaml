@@ -1,5 +1,4 @@
-name: Build Delta Custom Forks (Unsigned)
-
+name: Build Delta 
 on:
   workflow_dispatch:
 
@@ -9,57 +8,29 @@ jobs:
     runs-on: macos-14
 
     steps:
+      - name: Select Xcode 15.4
+        # This version of Xcode is 100% compatible with Delta's current code
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
       - name: Checkout Delta (Your Fork)
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Sync Submodule URLs
+      - name: Sync Submodules
         run: |
-          # This ensures the runner uses the URLs defined in your .gitmodules
           git submodule sync --recursive
           git submodule update --init --recursive
 
       - name: Install Dependencies
         run: |
-          sudo gem install cocoapods xcodeproj
+          sudo gem install cocoapods
           pod install
-
-      - name: Fix Swift 6 Compatibility & Missing Types
-        run: |
-          sudo gem install xcodeproj
-          ruby -e "
-          require 'xcodeproj'
-          Dir.glob('**/*.xcodeproj').each do |path|
-            puts \"Patching #{path}...\"
-            project = Xcodeproj::Project.open(path)
-            project.targets.each do |target|
-              target.build_configurations.each do |config|
-                # Force Swift 5 and kill the new concurrency checks
-                config.build_settings['SWIFT_VERSION'] = '5.0'
-                config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
-                config.build_settings['OTHER_SWIFT_FLAGS'] = '$(inherited) -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-stack-outputs'
-                config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-              end
-            end
-            project.save
-          end"
-
-      - name: Patch DeltaFeatures Source
-        run: |
-          # 1. Force the Option struct to require OptionValue
-          sed -i '' 's/public struct Option<Value>/public struct Option<Value: OptionValue>/g' Delta/DeltaFeatures/Option.swift
-          
-          # 2. Fix the specific method signature that is failing
-          sed -i '' 's/func optionValue<Value>(forKey/func optionValue<Value: OptionValue>(forKey/g' Delta/DeltaFeatures/Option.swift
-          
-          # 3. Fix the closure/implementation call
-          sed -i '' 's/defaultValue as? Value/defaultValue as? Value where Value: OptionValue/g' Delta/DeltaFeatures/Option.swift || true
-
 
       - name: Build Unsigned Archive
         run: |
+          # We use xcodebuild to create a generic iOS archive without signing
           xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
@@ -69,19 +40,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGNING_IDENTITY=""
 
       - name: Package IPA
         run: |
           mkdir -p Payload
-          # Locate the .app and copy it to Payload
+          # Since your structure is direct, we pull the .app from the archive
           cp -r build/Delta.xcarchive/Products/Applications/Delta.app Payload/
-          # Create the final IPA file
-          zip -r Delta-Custom.ipa Payload
+          zip -r Delta-Build.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-Build-Unsigned
-          path: Delta-Custom.ipa
+          name: Delta-IPA-Unsigned
+          path: Delta-Build.ipa
+
+ 
