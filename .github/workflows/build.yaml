@@ -46,6 +46,17 @@ jobs:
             project.save
           end"
 
+      - name: Patch DeltaFeatures Source
+        run: |
+          # 1. Force the Option struct to require OptionValue
+          sed -i '' 's/public struct Option<Value>/public struct Option<Value: OptionValue>/g' Delta/DeltaFeatures/Option.swift
+          
+          # 2. Fix the specific method signature that is failing
+          sed -i '' 's/func optionValue<Value>(forKey/func optionValue<Value: OptionValue>(forKey/g' Delta/DeltaFeatures/Option.swift
+          
+          # 3. Fix the closure/implementation call
+          sed -i '' 's/defaultValue as? Value/defaultValue as? Value where Value: OptionValue/g' Delta/DeltaFeatures/Option.swift || true
+
 
       - name: Build Unsigned Archive
         run: |
