@@ -34,15 +34,16 @@ jobs:
           xcodebuild build \
             -workspace Delta.xcworkspace \
             -scheme Delta \
-            -sdk iphoneos17.5 \
-            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE_SPECIFIER=""
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
-          # Create the Payload folder structure required for an IPA package
+          # IPAパッケージに必要なPayloadフォルダ構造の作成
           mkdir -p build/Payload
           cp -R build/Release-iphoneos/Delta.app build/Payload/
           cd build && zip -r Delta.ipa Payload/
