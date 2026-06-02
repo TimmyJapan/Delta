@@ -5,18 +5,19 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14 # Uses a modern macOS cloud runner with Xcode pre-installed
+    runs-on: macos-15 # FIX: Upgraded to macOS 15 runner
     
     steps:
       - name: Checkout Code with Submodules
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive' # CRITICAL: This pulls all the emulator cores!
+          submodules: 'recursive'
           fetch-depth: 0
 
       - name: Select Xcode Version
         run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          # FIX: Target Xcode 16 to support Project Format 77
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
           xcodebuild -version
 
       - name: Install Dependencies
@@ -30,7 +31,6 @@ jobs:
 
       - name: Build and Package .ipa (Unsigned)
         run: |
-          # We use CODE_SIGNING_ALLOWED=NO to bypass Apple Developer Account blocks on the cloud
           xcodebuild build \
             -workspace Delta.xcworkspace \
             -scheme Delta \
