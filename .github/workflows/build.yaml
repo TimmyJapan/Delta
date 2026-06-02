@@ -1,12 +1,11 @@
 name: Build Delta Emulator (.ipa)
 
 on:
-  workflow_dispatch: # GitHubのUIから手動で実行可能
+  workflow_dispatch:
 
 jobs:
   build:
-    # Swift 6.0をサポートするXcode 16を使うため、macos-15を強制指定
-    runs-on: macos-15 
+    runs-on: macos-15 # Swift 6.0のためにXcode 16環境を維持
     
     steps:
       - name: Checkout Code with Submodules
@@ -17,7 +16,6 @@ jobs:
 
       - name: Select Xcode Version
         run: |
-          # Swift 6.0が含まれるXcode 16を選択
           sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
           xcodebuild -version
 
@@ -32,25 +30,27 @@ jobs:
 
       - name: Build and Package .ipa (Unsigned)
         run: |
-          # サーバーに存在するシミュレータ環境を利用して、Swift 6.0のビルドを強制突破
+          # SDK不足の判定を回避するため、内部のデプロイターゲットを一括でiOS 17に引き下げて強制ビルドします
           xcodebuild build \
             -workspace Delta.xcworkspace \
             -scheme Delta \
-            -sdk iphonesimulator \
-            -destination "generic/platform=iOS Simulator" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            ANY_BUNDLE_IDENTIFIER_ALLOWED=YES
+            ANY_BUNDLE_IDENTIFIER_ALLOWED=YES \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
+            MARKETING_VERSION=1.6
 
-          # 生成されたバイナリを抽出し、SideStore等のサイドロードに対応したIPA構造を作成
+          # IPAパッケージに必要なPayloadフォルダ構造の作成
           mkdir -p build/Payload
-          cp -R build/Release-iphonesimulator/Delta.app build/Payload/
+          cp -R build/Release-iphoneos/Delta.app build/Payload/
           
-          # 競合を防ぐため、内部の不完全な署名データを削除
+          # 内部の不完全なコード署名を削除してSideStore等のエラーを防止
           rm -rf build/Payload/Delta.app/_CodeSignature
           
           # パッケージング
@@ -61,4 +61,5 @@ jobs:
         with:
           name: Delta-Unsigned-IPA
           path: build/Delta.ipa
+
 
