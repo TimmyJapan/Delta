@@ -29,30 +29,61 @@ jobs:
         run: |
           xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
 
+name: Build Delta Emulator (.ipa)
+
+on:
+  workflow_dispatch: # GitHubのUIから手動で実行可能
+
+jobs:
+  build:
+    # macOS 14 に戻します（これにより、最初から安定したiOS 17.x SDKが使えます）
+    runs-on: macos-14 
+    
+    steps:
+      - name: Checkout Code with Submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      - name: Select Xcode Version
+        run: |
+          # iOS SDKが確実に完全インストールされている Xcode 15.4 を指定
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install Dependencies
+        run: |
+          pod repo update
+          pod install --repo-update
+
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
+
       - name: Build and Package .ipa (Unsigned)
         run: |
-          # 1. SDKのバージョン制限を回避するため、シミュレータ向けにアーカイブを生成
-          xcodebuild archive \
+          # 有効なSDK環境で、実機向けにビルドを走らせます
+          xcodebuild build \
             -workspace Delta.xcworkspace \
             -scheme Delta \
-            -sdk iphonesimulator \
-            -destination "generic/platform=iOS Simulator" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
-            -archivePath build/Delta.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # 2. 生成されたアーカイブからアプリ本体を抽出してPayloadを構築
+          # IPAパッケージに必要なPayloadフォルダ構造の作成
           mkdir -p build/Payload
-          cp -R build/Delta.xcarchive/Products/Applications/Delta.app build/Payload/
+          cp -R build/Release-iphoneos/Delta.app build/Payload/
           
-          # 3. 内部の不完全なコード署名データを完全に除去
+          # 内部の不完全なコード署名を削除してSideStore等のエラーを防止
           rm -rf build/Payload/Delta.app/_CodeSignature
           
-          # 4. IPAファイルとしてパッケージング
+          # パッケージング
           cd build && zip -r Delta.ipa Payload/
 
       - name: Upload Finished IPA
