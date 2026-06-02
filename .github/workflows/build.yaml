@@ -1,37 +1,6 @@
 name: Build Delta Emulator (.ipa)
 
 on:
-  workflow_dispatch: # Allows you to manually trigger the build from GitHub's UI
-
-jobs:
-  build:
-    runs-on: macos-15 # FIX: Upgraded to macOS 15 runner
-    
-    steps:
-      - name: Checkout Code with Submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-          fetch-depth: 0
-
-      - name: Select Xcode Version
-        run: |
-          # FIX: Target Xcode 16 to support Project Format 77
-          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Install Dependencies
-        run: |
-          pod repo update
-          pod install --repo-update
-
-      - name: Resolve Swift Packages
-        run: |
-          xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
-
-name: Build Delta Emulator (.ipa)
-
-on:
   workflow_dispatch: # GitHubのUIから手動で実行可能
 
 jobs:
