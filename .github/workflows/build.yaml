@@ -35,6 +35,7 @@ jobs:
             -workspace Delta.xcworkspace \
             -scheme Delta \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
