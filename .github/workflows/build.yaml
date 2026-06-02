@@ -31,12 +31,12 @@ jobs:
 
       - name: Build and Package .ipa (Unsigned)
         run: |
-          # 1. 署名要求を完全にバイパスしたアーカイブを作成する
+          # 1. SDKのバージョン制限を回避するため、シミュレータ向けにアーカイブを生成
           xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
             -configuration Release \
             -archivePath build/Delta.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
@@ -45,11 +45,11 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # 2. 生成された.xcarchiveからアプリ本体を抽出してPayloadを構築する
+          # 2. 生成されたアーカイブからアプリ本体を抽出してPayloadを構築
           mkdir -p build/Payload
           cp -R build/Delta.xcarchive/Products/Applications/Delta.app build/Payload/
           
-          # 3. 内部の不完全なコード署名を完全に除去（SideStore等での再署名トラブル防止）
+          # 3. 内部の不完全なコード署名データを完全に除去
           rm -rf build/Payload/Delta.app/_CodeSignature
           
           # 4. IPAファイルとしてパッケージング
