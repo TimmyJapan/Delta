@@ -34,7 +34,7 @@ jobs:
           xcodebuild build \
             -workspace Delta.xcworkspace \
             -scheme Delta \
-            -sdk iphoneos \
+            -sdk iphoneos17.5 \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
