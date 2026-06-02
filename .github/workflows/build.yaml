@@ -31,22 +31,28 @@ jobs:
 
       - name: Build and Package .ipa (Unsigned)
         run: |
-          xcodebuild build \
+          # 1. 署名要求を完全にバイパスしたアーカイブを作成する
+          xcodebuild archive \
             -workspace Delta.xcworkspace \
             -scheme Delta \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -configuration Release \
-            CODE_SIGNING_ALLOWED=YES \
+            -archivePath build/Delta.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # IPAパッケージに必要なPayloadフォルダ構造の作成
+          # 2. 生成された.xcarchiveからアプリ本体を抽出してPayloadを構築する
           mkdir -p build/Payload
-          cp -R build/Release-iphoneos/Delta.app build/Payload/
+          cp -R build/Delta.xcarchive/Products/Applications/Delta.app build/Payload/
+          
+          # 3. 内部の不完全なコード署名を完全に除去（SideStore等での再署名トラブル防止）
+          rm -rf build/Payload/Delta.app/_CodeSignature
+          
+          # 4. IPAファイルとしてパッケージング
           cd build && zip -r Delta.ipa Payload/
 
       - name: Upload Finished IPA
