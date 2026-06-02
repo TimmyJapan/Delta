@@ -1,71 +1,53 @@
-name: Build Delta (Root Features Fix)
+name: Build Delta Emulator (.ipa)
 
 on:
-  workflow_dispatch:
-
-permissions:
-  contents: read  # Added Git permissions to address access issues.
+  workflow_dispatch: # Allows you to manually trigger the build from GitHub's UI
 
 jobs:
   build:
-    name: Build Unsigned IPA
-    runs-on: macos-14
-
+    runs-on: macos-14 # Uses a modern macOS cloud runner with Xcode pre-installed
+    
     steps:
-
-      - name: Select Xcode 15.4
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-
-      - name: Checkout Delta (Your Fork)
+      - name: Checkout Code with Submodules
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'recursive' # CRITICAL: This pulls all the emulator cores!
           fetch-depth: 0
 
-      - name: Sync and Update Submodules
+      - name: Select Xcode Version
         run: |
-          git config --global --add safe.directory /github/workspace
-          git submodule sync --recursive
-          git submodule update --init --recursive
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          xcodebuild -version
 
-      - name: Install CocoaPods
+      - name: Install Dependencies
         run: |
-          sudo gem install cocoapods
-          pod install
+          pod repo update
+          pod install --repo-update
 
-      - name: Patch Source Code & Project Files
+      - name: Resolve Swift Packages
         run: |
-          # 1. Fix the Swift Version in all project files (GPGX, etc.)
-          find . -name "project.pbxproj" -exec sed -i '' 's/SWIFT_VERSION = 6.0;/SWIFT_VERSION = 5.0;/g' {} +
-          
-          # 2. Fix the 'OptionValue' constraint in Option.swift (Root Directory)
-          # This line changes 'struct Option<Value>' to 'struct Option<Value: OptionValue>'
-          sed -i '' 's/public struct Option<Value>/public struct Option<Value: OptionValue>/g' DeltaFeatures/Option.swift
-          
-          # 3. Fix the instance method signature if it's separate
-          sed -i '' 's/extension Option where Value/extension Option where Value: OptionValue/g' DeltaFeatures/Option.swift
+          xcodebuild -resolvePackageDependencies -workspace Delta.xcworkspace -scheme Delta
 
-      - name: Build Unsigned Archive
+      - name: Build and Package .ipa (Unsigned)
         run: |
-          xcodebuild archive \
+          # We use CODE_SIGNING_ALLOWED=NO to bypass Apple Developer Account blocks on the cloud
+          xcodebuild build \
             -workspace Delta.xcworkspace \
             -scheme Delta \
-            -configuration Release \
             -sdk iphoneos \
-            -archivePath $PWD/build/Delta.xcarchive \
+            -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
 
-      - name: Package IPA
-        run: |
-          mkdir -p Payload
-          cp -r build/Delta.xcarchive/Products/Applications/Delta.app Payload/
-          zip -r Delta-Fixed.ipa Payload
+          # Create the Payload folder structure required for an IPA package
+          mkdir -p build/Payload
+          cp -R build/Release-iphoneos/Delta.app build/Payload/
+          cd build && zip -r Delta.ipa Payload/
 
-      - name: Upload IPA
+      - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Delta-Fixed-IPA
-          path: Delta-Fixed.ipa
+          name: Delta-Unsigned-IPA
+          path: build/Delta.ipa
